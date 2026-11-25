@@ -1,0 +1,35 @@
+# Groups the managed clusters of the platform and lets the GitOps and
+# governance namespaces on the hub place workloads/policies on them.
+#
+# Clusters join the set with:
+#   oc label managedcluster <name> cluster.open-cluster-management.io/clusterset=platform --overwrite
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSet
+metadata:
+  name: platform
+spec:
+  clusterSelector:
+    selectorType: ExclusiveClusterSetLabel
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-policies
+---
+# The binding name must match spec.clusterSet.
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: platform
+  namespace: openshift-gitops
+spec:
+  clusterSet: platform
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: platform
+  namespace: platform-policies
+spec:
+  clusterSet: platform
