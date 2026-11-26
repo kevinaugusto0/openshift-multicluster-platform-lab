@@ -1,0 +1,46 @@
+# Tenant onboarding as code: every folder under onboarding/tenants/ becomes
+# an Argo CD Application on every cluster selected by the platform-clusters
+# Placement. Onboarding a new project = one pull request.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenant-onboarding
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusterDecisionResource:
+              configMapRef: acm-placement
+              labelSelector:
+                matchLabels:
+                  cluster.open-cluster-management.io/placement: platform-clusters
+              requeueAfterSeconds: 180
+          - git:
+              repoURL: https://github.com/kevinaugusto0/openshift-multicluster-platform-lab.git
+              revision: main
+              directories:
+                - path: onboarding/tenants/*
+  template:
+    metadata:
+      name: '{{ .name }}-{{ .path.basename }}'
+      labels:
+        platform.lab/component: tenant-onboarding
+    spec:
+      # Lab default. In production, scope tenants with a dedicated AppProject.
+      project: default
+      source:
+        repoURL: https://github.com/kevinaugusto0/openshift-multicluster-platform-lab.git
+        targetRevision: main
+        path: '{{ .path.path }}'
+      destination:
+        server: '{{ .server }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
