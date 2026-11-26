@@ -1,0 +1,34 @@
+name: validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint YAML
+        run: |
+          pipx install yamllint
+          yamllint -d '{extends: relaxed, rules: {line-length: disable}}' .
+
+      - name: Install kustomize and kubeconform
+        run: |
+          curl -sSfL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin
+          curl -sSfL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | sudo tar xz -C /usr/local/bin kubeconform
+
+      - name: Build and validate every tenant overlay
+        run: |
+          for tenant in onboarding/tenants/*/; do
+            echo "::group::${tenant}"
+            kustomize build "${tenant}" | kubeconform -strict -summary -
+            echo "::endgroup::"
+          done
+
+      - name: Validate hub and governance manifests (CRD schemas skipped)
+        run: kubeconform -strict -summary -ignore-missing-schemas hub/ governance/
